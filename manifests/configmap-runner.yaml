@@ -20,8 +20,11 @@ data:
     : "${EXTRA_FIO_ARGS:=}"
     : "${JOBS:=}"
     : "${JOB_MODE:=}"
+    : "${JOB_FILTER:=}"
+    : "${JOB_EXCLUDE:=}"
     : "${ITERATION_SLEEP_SECS:=0}"
     : "${PERCENTILES:=50:95:99}"
+    : "${RUNTIME_PRE_JOB:=}"
 
     # Sanitize numeric inputs to avoid arithmetic errors
     sanitize_integer() {
@@ -36,6 +39,13 @@ data:
     case "${RUNTIME_PER_JOB:-}" in
       ''|*[!0-9]*) RUNTIME_PER_JOB="" ;;
     esac
+    case "${RUNTIME_PRE_JOB:-}" in
+      ''|*[!0-9]*) RUNTIME_PRE_JOB="" ;;
+    esac
+    # Prefer RUNTIME_PRE_JOB if provided
+    if [ -n "${RUNTIME_PRE_JOB}" ]; then
+      RUNTIME_PER_JOB="${RUNTIME_PRE_JOB}"
+    fi
 
     start_ts=$(date -u +%Y%m%dT%H%M%SZ)
     node_name=$(cat /etc/hostname || true)
@@ -72,7 +82,18 @@ data:
     # Build job list
     job_list="${JOBS}"
     if [ -z "${job_list}" ] && [ "${run_mode}" = "per_section" ]; then
-      job_list=$(list_sections | tr '\n' ',')
+      sections=$(list_sections)
+      if [ -n "${JOB_FILTER}" ]; then
+        sections=$(echo "${sections}" | grep -E "${JOB_FILTER}" || true)
+      fi
+      if [ -n "${JOB_EXCLUDE}" ]; then
+        sections=$(echo "${sections}" | grep -Ev "${JOB_EXCLUDE}" || true)
+      fi
+      if command -v paste >/dev/null 2>&1; then
+        job_list=$(echo "${sections}" | paste -sd, -)
+      else
+        job_list=$(echo "${sections}" | tr '\n' ',' | sed 's/,$//')
+      fi
     fi
 
     i=0
