@@ -23,6 +23,20 @@ data:
     : "${ITERATION_SLEEP_SECS:=0}"
     : "${PERCENTILES:=50:95:99}"
 
+    # Sanitize numeric inputs to avoid arithmetic errors
+    sanitize_integer() {
+      case "$1" in
+        ''|*[!0-9]*) echo "$2" ;;
+        *) echo "$1" ;;
+      esac
+    }
+    HOURS=$(sanitize_integer "${HOURS}" "1")
+    ITERATION_SLEEP_SECS=$(sanitize_integer "${ITERATION_SLEEP_SECS}" "0")
+    RAMP_TIME=$(sanitize_integer "${RAMP_TIME:-0}" "0")
+    case "${RUNTIME_PER_JOB:-}" in
+      ''|*[!0-9]*) RUNTIME_PER_JOB="" ;;
+    esac
+
     start_ts=$(date -u +%Y%m%dT%H%M%SZ)
     node_name=$(cat /etc/hostname || true)
     mkdir -p "${RESULTS_DIR}/${SC_NAME}/${node_name}"

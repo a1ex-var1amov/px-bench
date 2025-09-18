@@ -9,6 +9,7 @@ spec:
   resources:
     requests:
       storage: 20Gi
+  storageClassName: ocs-storagecluster-cephfs
   # IMPORTANT: set to a Portworx RWX-capable StorageClass in your cluster
   # storageClassName: px-sharedv4-sc
 

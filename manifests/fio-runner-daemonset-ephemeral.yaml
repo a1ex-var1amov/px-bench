@@ -24,7 +24,7 @@ spec:
       containers:
       - name: fio
         image: dmonakhov/alpine-fio
-        command: ["/bin/sh","-lc","chmod +x /runner/runner.sh && /runner/runner.sh"]
+        command: ["/bin/sh","-lc","/runner/runner.sh"]
         securityContext:
           privileged: true
         env:
@@ -35,7 +35,7 @@ spec:
         - name: SIZE
           value: "1GiB"
         - name: SC_NAME
-          value: "CHANGE-ME"
+          value: "fio-repl1"
         - name: MODE
           value: "per-node"
         - name: RESULTS_DIR
@@ -85,5 +85,5 @@ spec:
               resources:
                 requests:
                   storage: 20Gi
-              storageClassName: CHANGE-ME
+              storageClassName: fio-repl1
 
