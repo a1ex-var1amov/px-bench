@@ -15,7 +15,7 @@ spec:
       containers:
       - name: fio
         image: dmonakhov/alpine-fio
-        command: ["/bin/sh","-lc","chmod +x /runner/runner.sh && /runner/runner.sh"]
+        command: ["/bin/sh","-lc","/runner/runner.sh"]
         securityContext:
           privileged: true
         env:

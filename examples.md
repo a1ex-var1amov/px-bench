@@ -79,4 +79,102 @@ Tip: The provided fio config uses `[global]` stonewall, so sections execute sequ
 ### DaemonSet variant (if you use the DaemonSet instead of Deployment)
 Replace `deploy/fio-runner-ephemeral` with `ds/fio-runner-ephemeral` in the commands above.
 
+## Parallel one-off runs using Job (N pods)
+
+Kubernetes Jobs can run multiple pods concurrently by setting `parallelism` and `completions`.
+
+- **Pattern**: run N pods in parallel, each completes once
+```bash
+oc -n px-bench create -f manifests/fio-runner-job.yaml --dry-run=client -o yaml \
+| yq e '.spec.parallelism = N | .spec.completions = N' - \
+| oc set env -f - JOB_MODE=per_section JOB_FILTER='read$' RUNTIME_PRE_JOB=60 HOURS=1 \
+| oc apply -f -
+
+oc -n px-bench get job fio-runner -o wide
+oc -n px-bench wait --for=condition=complete job/fio-runner --timeout=2h
+```
+
+Examples:
+- 2 pods: replace `N` with 2
+- 6 pods: replace `N` with 6
+- 9 pods: replace `N` with 9
+- 12 pods: replace `N` with 12
+
+If you don’t have `yq`, you can patch with `oc`:
+```bash
+oc -n px-bench create -f manifests/fio-runner-job.yaml --dry-run=client -o yaml \
+| oc apply -f -
+oc -n px-bench patch job fio-runner --type=merge -p '{"spec":{"parallelism":N,"completions":N}}'
+```
+
+To change the workload (writes, random, sequential), reuse the filters from the sections above via `oc set env -f - ...` before `oc apply -f -`.
+
+## Multi-StorageClass runs (matrix)
+
+Use the suite helper to run the same profile across the 4 StorageClasses: `fio-repl1`, `fio-repl1-encrypted`, `fio-repl2`, `fio-repl2-encrypted`.
+
+- Only reads, 6 pods per SC:
+```bash
+scripts/run-fio-suite.sh \
+  --mode single \
+  --parallel 6 \
+  --job-mode per_section \
+  --job-filter 'read$'
+```
+
+- Only writes, 6 pods per SC (sequential writes):
+```bash
+scripts/run-fio-suite.sh \
+  --mode single \
+  --parallel 6 \
+  --job-mode per_section \
+  --job-filter 'write$' \
+  --job-exclude 'rand|mix'
+```
+
+- Only random, 12 pods per SC (no mixed):
+```bash
+scripts/run-fio-suite.sh \
+  --mode single \
+  --parallel 12 \
+  --job-mode per_section \
+  --job-filter 'rand-(read|write)$' \
+  --job-exclude 'mix'
+```
+
+- Only sequential, 9 pods per SC:
+```bash
+scripts/run-fio-suite.sh \
+  --mode single \
+  --parallel 9 \
+  --job-mode per_section \
+  --job-filter '(read|write)$' \
+  --job-exclude 'rand|mix'
+```
+
+- Bonus: all tests in one run (per SC), 2 pods per SC:
+```bash
+scripts/run-fio-suite.sh \
+  --mode single \
+  --parallel 2 \
+  --job-mode all_in_one
+```
+
+### Single-SC sequencing with profiles
+Run all profiles for a specific StorageClass before moving to the next.
+
+- Reads → Writes → Random → Sequential across one SC (e.g., fio-repl1):
+```bash
+scripts/run-fio-suite.sh \
+  --sc fio-repl1 \
+  --mode single \
+  --parallel 6 \
+  --profiles reads,writes,random,sequential
+```
+
+- All-in-one only for one SC:
+```bash
+scripts/run-fio-suite.sh --sc fio-repl2 --mode single --parallel 2 --profiles all_in_one
+```
+
 
